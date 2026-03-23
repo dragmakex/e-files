@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto"
+import { createReadStream } from "node:fs"
 
 import { chunkDocumentPages } from "@/server/rag/chunking"
 import { embeddingProvider } from "@/server/embeddings/client"
@@ -20,6 +21,7 @@ type InputDocument = {
 }
 
 type IndexDocumentDeps = {
+  readonly hashDocument: (doc: InputDocument) => Promise<string>
   readonly getDocumentBySourceAndHash: typeof getDocumentBySourceAndHash
   readonly upsertDocument: typeof upsertDocument
   readonly deleteChunksForDocument: typeof deleteChunksForDocument
@@ -33,9 +35,22 @@ type IndexDocumentDeps = {
   readonly deactivateOtherReadyVersions: typeof deactivateOtherReadyVersions
 }
 
-const hashDocument = (doc: InputDocument): string => createHash("sha256").update(`${doc.path}:${doc.size}:${doc.mtimeMs}`).digest("hex")
+const hashDocument = async (doc: InputDocument): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const hash = createHash("sha256")
+    const stream = createReadStream(doc.path)
+
+    stream.on("data", (chunk) => {
+      hash.update(chunk)
+    })
+    stream.on("error", reject)
+    stream.on("end", () => {
+      resolve(hash.digest("hex"))
+    })
+  })
 
 const defaultDeps: IndexDocumentDeps = {
+  hashDocument,
   getDocumentBySourceAndHash,
   upsertDocument,
   deleteChunksForDocument,
@@ -50,14 +65,14 @@ const defaultDeps: IndexDocumentDeps = {
 }
 
 export const indexDocument = async (doc: InputDocument, deps: IndexDocumentDeps = defaultDeps): Promise<void> => {
-  const contentHash = hashDocument(doc)
-  const existing = await deps.getDocumentBySourceAndHash(doc.path, contentHash)
+  const contentHash = await deps.hashDocument(doc)
+  const existing = await deps.getDocumentBySourceAndHash(doc.filename, contentHash)
   if (existing?.status === "ready") {
     return
   }
 
   const stored = await deps.upsertDocument({
-    sourcePath: doc.path,
+    sourcePath: doc.filename,
     filename: doc.filename,
     contentHash,
     status: "indexing"
@@ -100,7 +115,7 @@ export const indexDocument = async (doc: InputDocument, deps: IndexDocumentDeps 
     }
 
     await deps.markDocumentStatus(stored.id, "ready", { pageCount: parsed.pageCount, lastIndexedAt: new Date() })
-    await deps.deactivateOtherReadyVersions(doc.path, stored.id)
+    await deps.deactivateOtherReadyVersions(doc.filename, stored.id)
   } catch (error) {
     await deps.markDocumentStatus(stored.id, "error")
     throw error

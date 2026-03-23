@@ -8,8 +8,9 @@ const baseEnv = {
   LOG_LEVEL: "info",
   SESSION_SECRET: "",
   DATABASE_URL: "",
-  LLM_PROVIDER: "glm-zhipu",
-  GLM_API_KEY: "",
+  PDF_DATA_DIR: "data",
+  LLM_PROVIDER: "openai-compatible",
+  LLM_API_KEY: "",
   LLM_BASE_URL: "",
   LLM_MODEL: "",
   LLM_TIMEOUT_MS: "30000",
@@ -45,8 +46,24 @@ const makeEnv = (overrides: Partial<Record<string, string>> = {}) => ({ ...baseE
 test("parseEnvironment applies defaults and accepts valid dev config", () => {
   const env = parseEnvironment(makeEnv(), "fallback-secret-32-characters--okok")
   expect(env.nodeEnv).toBe("development")
+  expect(env.pdfDataDir).toBe("data")
   expect(env.embeddings.provider).toBe("mock")
   expect(env.rateLimit.chatMax).toBe(10)
+})
+
+test("parseEnvironment accepts openai-compatible and custom pdf data dir", () => {
+  const env = parseEnvironment(
+    makeEnv({
+      LLM_PROVIDER: "openai-compatible",
+      LLM_API_KEY: "token",
+      PDF_DATA_DIR: "/srv/e-files/pdfs"
+    }),
+    "fallback-secret-32-characters--okok"
+  )
+
+  expect(env.llm.provider).toBe("openai-compatible")
+  expect(env.llm.apiKey).toBe("token")
+  expect(env.pdfDataDir).toBe("/srv/e-files/pdfs")
 })
 
 test("parseEnvironment enforces production required secrets", () => {
@@ -91,7 +108,7 @@ test("parseEnvironment allows missing production secrets during next build phase
 
 test("parseEnvironment rejects unknown provider values", () => {
   expect(() => parseEnvironment(makeEnv({ LLM_PROVIDER: "unknown" }), "fallback-secret-32-characters--okok")).toThrow(
-    "LLM_PROVIDER must be one of: glm-zhipu, mock"
+    "LLM_PROVIDER must be one of: openai-compatible, mock"
   )
 })
 
@@ -111,4 +128,27 @@ test("parseEnvironment validates overlap and chunk size relationship", () => {
       "fallback-secret-32-characters--okok"
     )
   ).toThrow("RAG_CHUNK_OVERLAP must be less than RAG_CHUNK_SIZE")
+})
+
+test("parseEnvironment validates x402 boolean format", () => {
+  expect(() =>
+    parseEnvironment(
+      makeEnv({
+        X402_ENABLED: "yes"
+      }),
+      "fallback-secret-32-characters--okok"
+    )
+  ).toThrow("X402_ENABLED must be true or false")
+})
+
+test("parseEnvironment requires payTo wallet when x402 is enabled", () => {
+  expect(() =>
+    parseEnvironment(
+      makeEnv({
+        X402_ENABLED: "true",
+        X402_PAY_TO: ""
+      }),
+      "fallback-secret-32-characters--okok"
+    )
+  ).toThrow("X402_PAY_TO is required when X402_ENABLED=true")
 })

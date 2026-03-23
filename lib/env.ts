@@ -7,15 +7,27 @@ const EnvSchema = Schema.Struct({
   LOG_LEVEL: Schema.optional(Schema.String),
   SESSION_SECRET: Schema.optional(Schema.String),
   DATABASE_URL: Schema.optional(Schema.String),
+  PDF_DATA_DIR: Schema.optional(Schema.String),
   LLM_PROVIDER: Schema.optional(Schema.String),
-  GLM_API_KEY: Schema.optional(Schema.String),
+  LLM_API_KEY: Schema.optional(Schema.String),
   LLM_BASE_URL: Schema.optional(Schema.String),
   LLM_MODEL: Schema.optional(Schema.String),
   EMBEDDING_PROVIDER: Schema.optional(Schema.String),
   EMBEDDING_API_KEY: Schema.optional(Schema.String),
   EMBEDDING_BASE_URL: Schema.optional(Schema.String),
   EMBEDDING_MODEL: Schema.optional(Schema.String),
-  ADMIN_INGEST_TOKEN: Schema.optional(Schema.String)
+  ADMIN_INGEST_TOKEN: Schema.optional(Schema.String),
+  X402_ENABLED: Schema.optional(Schema.String),
+  X402_FACILITATOR_URL: Schema.optional(Schema.String),
+  X402_NETWORK: Schema.optional(Schema.String),
+  X402_AMOUNT: Schema.optional(Schema.String),
+  X402_ASSET: Schema.optional(Schema.String),
+  X402_PAY_TO: Schema.optional(Schema.String),
+  X402_MAX_TIMEOUT_SECONDS: Schema.optional(Schema.String),
+  X402_RESOURCE_DESCRIPTION: Schema.optional(Schema.String),
+  X402_RESOURCE_MIME_TYPE: Schema.optional(Schema.String),
+  X402_ASSET_NAME: Schema.optional(Schema.String),
+  X402_ASSET_VERSION: Schema.optional(Schema.String)
 })
 
 const numberFromEnv = (value: string | undefined, fallback: number): number => {
@@ -38,6 +50,21 @@ const parseNumberInRange = (name: string, value: string | undefined, fallback: n
     throw new Error(`${name} must be between ${min} and ${max}`)
   }
   return parsed
+}
+
+const parseBoolean = (name: string, value: string | undefined, fallback: boolean): boolean => {
+  if (!value) return fallback
+  if (value === "true") return true
+  if (value === "false") return false
+  throw new Error(`${name} must be true or false`)
+}
+
+const parsePositiveIntegerString = (name: string, value: string | undefined, fallback: string): string => {
+  const selected = value ?? fallback
+  if (!/^[1-9]\d*$/.test(selected)) {
+    throw new Error(`${name} must be a positive integer string`)
+  }
+  return selected
 }
 
 const oneOf = <T extends string>(name: string, value: string | undefined, fallback: T, allowed: ReadonlyArray<T>): T => {
@@ -69,6 +96,7 @@ export const parseEnvironment = (processEnv: NodeJS.ProcessEnv, fallbackSessionS
   const isNextProductionBuild = processEnv.NEXT_PHASE === "phase-production-build"
   const logLevel = oneOf("LOG_LEVEL", parsedRaw.LOG_LEVEL, "info", ["debug", "info", "warn", "error"])
   const sessionSecret = parsedRaw.SESSION_SECRET ?? fallbackSessionSecret ?? randomBytes(32).toString("hex")
+  const x402Enabled = parseBoolean("X402_ENABLED", parsedRaw.X402_ENABLED, false)
 
   const output = {
     nodeEnv,
@@ -76,9 +104,10 @@ export const parseEnvironment = (processEnv: NodeJS.ProcessEnv, fallbackSessionS
     logLevel,
     sessionSecret,
     databaseUrl: parsedRaw.DATABASE_URL ?? "",
+    pdfDataDir: parsedRaw.PDF_DATA_DIR ?? "data",
     llm: {
-      provider: oneOf("LLM_PROVIDER", parsedRaw.LLM_PROVIDER, "glm-zhipu", ["glm-zhipu", "mock"]),
-      apiKey: parsedRaw.GLM_API_KEY ?? "",
+      provider: oneOf("LLM_PROVIDER", parsedRaw.LLM_PROVIDER, "openai-compatible", ["openai-compatible", "mock"]),
+      apiKey: parsedRaw.LLM_API_KEY ?? "",
       baseUrl: parsedRaw.LLM_BASE_URL ?? "",
       model: parsedRaw.LLM_MODEL ?? "",
       timeoutMs: parseInteger("LLM_TIMEOUT_MS", processEnv.LLM_TIMEOUT_MS, 30000),
@@ -115,7 +144,20 @@ export const parseEnvironment = (processEnv: NodeJS.ProcessEnv, fallbackSessionS
       retryBaseMs: parseInteger("JOB_RETRY_BASE_MS", processEnv.JOB_RETRY_BASE_MS, 5000),
       retryMaxMs: parseInteger("JOB_RETRY_MAX_MS", processEnv.JOB_RETRY_MAX_MS, 60000)
     },
-    adminIngestToken: parsedRaw.ADMIN_INGEST_TOKEN ?? ""
+    adminIngestToken: parsedRaw.ADMIN_INGEST_TOKEN ?? "",
+    x402: {
+      enabled: x402Enabled,
+      facilitatorUrl: ensureHttpUrl("X402_FACILITATOR_URL", parsedRaw.X402_FACILITATOR_URL ?? "https://x402.org/facilitator"),
+      network: parsedRaw.X402_NETWORK ?? "eip155:84532",
+      amount: parsePositiveIntegerString("X402_AMOUNT", parsedRaw.X402_AMOUNT, "10000"),
+      asset: parsedRaw.X402_ASSET ?? "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      payTo: parsedRaw.X402_PAY_TO ?? "",
+      maxTimeoutSeconds: parseInteger("X402_MAX_TIMEOUT_SECONDS", parsedRaw.X402_MAX_TIMEOUT_SECONDS, 60),
+      resourceDescription: parsedRaw.X402_RESOURCE_DESCRIPTION ?? "Per-request chat response",
+      resourceMimeType: parsedRaw.X402_RESOURCE_MIME_TYPE ?? "application/json",
+      assetName: parsedRaw.X402_ASSET_NAME ?? "USDC",
+      assetVersion: parsedRaw.X402_ASSET_VERSION ?? "2"
+    }
   }
 
   if (output.rag.chunkOverlap >= output.rag.chunkSize) {
@@ -126,6 +168,9 @@ export const parseEnvironment = (processEnv: NodeJS.ProcessEnv, fallbackSessionS
   }
   if (output.worker.retryBaseMs > output.worker.retryMaxMs) {
     throw new Error("JOB_RETRY_BASE_MS must be <= JOB_RETRY_MAX_MS")
+  }
+  if (output.x402.enabled && !output.x402.payTo) {
+    throw new Error("X402_PAY_TO is required when X402_ENABLED=true")
   }
 
   if (output.nodeEnv === "production" && !isNextProductionBuild) {

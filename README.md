@@ -13,7 +13,7 @@ Next.js + Bun + PostgreSQL/pgvector + Effect app for retrieval-grounded chat ove
 ## Commands
 
 - `bun run index:corpus` indexes local PDFs
-- `bun run smoke:glm` runs manual GLM smoke test
+- `bun run smoke:llm` runs manual LLM smoke test
 - `bun run test` executes tests
 - `bun run check` runs lint/typecheck/tests
 - `bun run build` performs production build validation
@@ -23,6 +23,7 @@ Next.js + Bun + PostgreSQL/pgvector + Effect app for retrieval-grounded chat ove
 - `LLM_BASE_URL` and `LLM_MODEL` are provider-plan specific; keep them environment-driven.
 - App uses retrieval citations and refuses fabricated evidence by system prompt policy.
 - In production runtime, `SESSION_SECRET` (>= 32 chars) and `DATABASE_URL` are required.
+- Optional: enable per-request x402 billing for `POST /api/chat` with `X402_ENABLED=true` and a funded `X402_PAY_TO` address.
 
 ## Railway Prep (No Deployment Executed)
 

@@ -18,7 +18,7 @@
     "db:migrate:status": "bun run scripts/migrate.ts --status",
     "index:corpus": "bun run scripts/index-corpus.ts",
     "worker": "bun run scripts/run-worker.ts",
-    "smoke:glm": "bun run scripts/smoke-glm.ts",
+    "smoke:llm": "bun run scripts/smoke-llm.ts",
     "scrape": "bun scripts/scrape_e.js",
     "prepare": "effect-language-service patch"
   },

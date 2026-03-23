@@ -37,6 +37,7 @@ const createChatDeps = (sessionId: string): ChatPostDependencies => ({
   parseJsonBody: async () => ({ threadId: createdThreadId, question: "Who owns this thread?" }),
   decodeChatRequest: (input) => input as { threadId: string; question: string },
   getOrCreateSession: async () => ({ sessionKey: `${sessionId}_key`, sessionId }),
+  requireX402Payment: async () => null,
   assertThreadOwnership: assertOwnership,
   clientIpFromRequest: () => "198.51.100.2",
   enforceRateLimit: async () => {},

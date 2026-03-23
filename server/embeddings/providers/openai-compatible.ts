@@ -39,7 +39,8 @@ export const OpenAiCompatibleEmbeddingProvider: EmbeddingProvider = {
           },
           body: JSON.stringify({
             model: env.embeddings.model,
-            input: texts
+            input: texts,
+            dimensions: env.embeddings.dimensions
           }),
           signal: controller.signal
         })

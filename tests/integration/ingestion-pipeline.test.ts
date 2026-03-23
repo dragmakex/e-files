@@ -20,6 +20,7 @@ test("indexDocument returns early when ready version already exists", async () =
   await indexDocument(
     { path: "/tmp/existing.pdf", filename: "existing.pdf", mtimeMs: 100, size: 10 },
     {
+      hashDocument: async () => "content_hash",
       getDocumentBySourceAndHash: async () => makeDocumentRecord({ id: "doc_existing", status: "ready" }),
       upsertDocument: async (input) => {
         upsertCalled = true
@@ -83,6 +84,7 @@ test("indexDocument stores page metadata, chunks, and embeddings", async () => {
   await indexDocument(
     { path: "/tmp/new.pdf", filename: "new.pdf", mtimeMs: 200, size: 20 },
     {
+      hashDocument: async () => "content_hash",
       getDocumentBySourceAndHash: async () => null,
       upsertDocument: async (input) => makeDocumentRecord({ id: "doc_1", ...input }),
       deleteChunksForDocument: async () => {},

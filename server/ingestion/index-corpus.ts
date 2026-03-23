@@ -1,9 +1,10 @@
+import { env } from "@/lib/env"
 import { discoverLocalPdfs } from "@/server/ingestion/discover"
 import { indexDocument } from "@/server/ingestion/index-document"
 import { reportProgress } from "@/server/jobs/progress"
 
 export const indexCorpus = async (jobId?: string): Promise<void> => {
-  const documents = await discoverLocalPdfs()
+  const documents = await discoverLocalPdfs(env.pdfDataDir)
   if (documents.length === 0) {
     if (jobId) await reportProgress(jobId, 100)
     return

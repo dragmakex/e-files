@@ -6,7 +6,7 @@ console.log("Provider:", provider.name)
 console.log("Health:", health ?? { ok: "unknown" })
 
 if (provider.name === "mock") {
-  console.log("Mock provider is active; set LLM_PROVIDER and GLM_* env vars for real smoke test")
+  console.log("Mock provider is active; set LLM_PROVIDER and LLM_* env vars for real smoke test")
   process.exit(0)
 }
 

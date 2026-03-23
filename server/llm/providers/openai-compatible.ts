@@ -3,7 +3,7 @@ import { env } from "@/lib/env"
 import type { LlmGenerateInput, LlmGenerateOutput, LlmProvider } from "@/server/llm/types"
 import { Schema } from "effect"
 
-const GlmResponseSchema = Schema.Struct({
+const OpenAiCompatibleResponseSchema = Schema.Struct({
   choices: Schema.Array(
     Schema.Struct({
       message: Schema.Struct({
@@ -67,15 +67,15 @@ const requestWithRetry = async (input: LlmGenerateInput): Promise<LlmGenerateOut
         if (!response.ok) {
           const detail = { status: response.status, body: await response.text() }
           if (isTransientStatus(response.status)) {
-            throw new ExternalServiceError("GLM transient error", detail)
+            throw new ExternalServiceError("OpenAI-compatible transient error", detail)
           }
-          throw new ExternalServiceError("GLM request failed", detail)
+          throw new ExternalServiceError("OpenAI-compatible request failed", detail)
         }
 
-        const payload = Schema.decodeUnknownSync(GlmResponseSchema)(await response.json())
+        const payload = Schema.decodeUnknownSync(OpenAiCompatibleResponseSchema)(await response.json())
         const text = payload.choices[0]?.message?.content
         if (!text) {
-          throw new ExternalServiceError("Unexpected GLM response")
+          throw new ExternalServiceError("Unexpected OpenAI-compatible response")
         }
 
         return {
@@ -91,7 +91,7 @@ const requestWithRetry = async (input: LlmGenerateInput): Promise<LlmGenerateOut
       }, env.llm.timeoutMs)
     } catch (error) {
       if (attempt === maxAttempts) {
-        throw error instanceof ExternalServiceError ? error : new ExternalServiceError("GLM request failed", error)
+        throw error instanceof ExternalServiceError ? error : new ExternalServiceError("OpenAI-compatible request failed", error)
       }
       const status = (error as { detail?: { status?: number } })?.detail?.status
       if (typeof status === "number" && !isTransientStatus(status)) {
@@ -102,14 +102,14 @@ const requestWithRetry = async (input: LlmGenerateInput): Promise<LlmGenerateOut
     }
   }
 
-  throw new ExternalServiceError("GLM request failed")
+  throw new ExternalServiceError("OpenAI-compatible request failed")
 }
 
-export const GlmZhipuProvider: LlmProvider = {
-  name: "glm-zhipu",
+export const OpenAiCompatibleLlmProvider: LlmProvider = {
+  name: "openai-compatible",
   async generate(input: LlmGenerateInput): Promise<LlmGenerateOutput> {
     if (!env.llm.apiKey || !env.llm.baseUrl || !env.llm.model) {
-      throw new ExternalServiceError("GLM provider is not configured")
+      throw new ExternalServiceError("OpenAI-compatible provider is not configured")
     }
 
     return requestWithRetry(input)
