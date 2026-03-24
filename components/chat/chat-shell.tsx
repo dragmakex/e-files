@@ -70,6 +70,16 @@ export function ChatShell() {
       <SensitiveCorpusDisclaimer />
       {error ? <p style={{ color: "#b91c1c" }} role="alert" aria-live="assertive">{error}</p> : null}
       <MessageList messages={messages} />
+      {pending ? (
+        <div className="window chat-loading" role="status" aria-live="polite">
+          <div className="chat-loading-title">Consulting the files...</div>
+          <div className="win-spinner" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
+      ) : null}
       <MessageInput onSend={onSend} disabled={pending || !threadId} />
       </div>
     </section>

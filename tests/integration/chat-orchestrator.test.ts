@@ -60,6 +60,37 @@ test("answer orchestrator generates grounded answer with citations and metadata"
   ])
 })
 
+test("answer orchestrator strips think blocks from llm output", async () => {
+  let count = 0
+  const inserted: Array<{ role: string; content: string }> = []
+
+  const answerQuestion = createAnswerQuestion({
+    insertMessage: async (input) => {
+      inserted.push({ role: input.role, content: input.content })
+      count += 1
+      return { id: `msg_${count}`, createdAt: new Date().toISOString() }
+    },
+    hybridRetrieve: async () => [sampleChunk],
+    assembleContextChunks: (chunks) => chunks,
+    llmProvider: () => ({
+      name: "test-llm",
+      generate: async () => ({
+        text: "<think>\nprivate chain of thought\n</think>\n\nHello! How can I assist you today?"
+      })
+    }),
+    baseSystemPrompt: "system",
+    buildUserPrompt: () => "unused",
+    toCitation,
+    noEvidenceResponse: "No evidence found.",
+    temporaryFailureResponse: "Temporary failure."
+  })
+
+  const result = await answerQuestion("thr_5", "Hello")
+
+  expect(result.answer).toBe("Hello! How can I assist you today?")
+  expect(inserted[1]?.content).toBe("Hello! How can I assist you today?")
+})
+
 test("answer orchestrator returns no-evidence fallback without calling llm", async () => {
   let llmCalled = false
 

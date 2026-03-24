@@ -209,6 +209,58 @@ a:focus-visible {
   flex-wrap: wrap;
 }
 
+.chat-loading {
+  margin-top: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #f3f0ed;
+}
+
+.chat-loading-title {
+  font-size: 13px;
+}
+
+.win-spinner {
+  width: 92px;
+  height: 18px;
+  padding: 2px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  border-top: 2px solid var(--border-deep);
+  border-left: 2px solid var(--border-deep);
+  border-right: 2px solid var(--border-light);
+  border-bottom: 2px solid var(--border-light);
+  background: #fff;
+}
+
+.win-spinner span {
+  background: linear-gradient(180deg, #2bb7ea, #0c64b0);
+  opacity: 0.2;
+  animation: win-spinner 1s steps(1, end) infinite;
+}
+
+.win-spinner span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.win-spinner span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes win-spinner {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

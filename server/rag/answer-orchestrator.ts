@@ -1,5 +1,6 @@
 import { ExternalServiceError } from "@/lib/errors"
 import { logger } from "@/lib/logger"
+import { stripThinkBlocks } from "@/lib/utils/text"
 import { llmProvider } from "@/server/llm/client"
 import { baseSystemPrompt, buildUserPrompt } from "@/server/llm/prompts"
 import { toCitation, type Citation } from "@/server/rag/citations"
@@ -90,12 +91,13 @@ export const createAnswerQuestion = (dependencies: AnswerQuestionDependencies) =
     }
   }
 
+  const cleanedAnswer = stripThinkBlocks(generated.text)
   const citations = selected.map(dependencies.toCitation)
 
   const assistantMessage = await dependencies.insertMessage({
     threadId,
     role: "assistant",
-    content: generated.text,
+    content: cleanedAnswer,
     citations,
     retrievalMeta: {
       candidateCount: retrieved.length,
@@ -106,7 +108,7 @@ export const createAnswerQuestion = (dependencies: AnswerQuestionDependencies) =
   return {
     userMessageId: userMessage.id,
     assistantMessageId: assistantMessage.id,
-    answer: generated.text,
+    answer: cleanedAnswer,
     citations,
     retrievalMeta: { candidateCount: retrieved.length, selectedCount: selected.length }
   }
