@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { MessageInput } from "@/components/chat/message-input"
 import { MessageList } from "@/components/chat/message-list"
 import { SensitiveCorpusDisclaimer } from "@/components/chat/sensitive-corpus-disclaimer"
+import { playUiAnswerReady } from "@/lib/ui/sound"
 
 type ChatMessage = {
   id: string
@@ -53,6 +54,7 @@ export function ChatShell() {
       const refreshed = await fetch(`/api/threads/${threadId}/messages`)
       const refreshedBody = await refreshed.json()
       setMessages(refreshedBody.messages)
+      playUiAnswerReady()
     } catch {
       setError("Unexpected error while sending message")
     } finally {

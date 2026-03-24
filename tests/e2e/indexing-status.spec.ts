@@ -4,12 +4,11 @@ import { renderToStaticMarkup } from "react-dom/server"
 
 import HomePage from "@/app/page"
 
-test("indexing status screen includes responsive table container and controls", () => {
+test("home page links into chat", () => {
   const html = renderToStaticMarkup(createElement(HomePage))
 
-  expect(html).toContain("Corpus Index Status")
-  expect(html).toContain('id="index-admin-token"')
-  expect(html).toContain('class="table-scroll"')
-  expect(html).toContain('class="status-table"')
-  expect(html).toContain("Run Indexing")
+  expect(html).toContain("Stickystein")
+  expect(html).toContain("Ask questions over the Epstein PDFs with citations.")
+  expect(html).toContain('href="/chat"')
+  expect(html).not.toContain("Corpus Index Status")
 })

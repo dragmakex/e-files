@@ -1,44 +1,50 @@
-# E-Files Secure RAG Chat
+# Stickystein
 
-Next.js + Bun + PostgreSQL/pgvector + Effect app for retrieval-grounded chat over local PDFs in `data/`.
+Next.js + Bun + PostgreSQL/pgvector app for asking questions over indexed PDFs with citations.
 
 ## Setup
 
-1. Install dependencies: `bun install`
-2. Copy envs: `cp .env.example .env`
-3. Run migrations: `bun run db:migrate`
-4. Start app: `bun run dev`
-5. Start worker: `bun run worker`
+1. Install dependencies:
+   `bun install`
+2. Copy envs:
+   `cp .env.example .env`
+3. Run migrations:
+   `bun run db:migrate`
 
-## Commands
+## Bun Commands
 
-- `bun run index:corpus` indexes local PDFs
-- `bun run smoke:llm` runs manual LLM smoke test
-- `bun run test` executes tests
-- `bun run check` runs lint/typecheck/tests
-- `bun run build` performs production build validation
+- `bun run dev`
+  Start the app in development mode.
+- `bun run build`
+  Build the app for production.
+- `bun run start`
+  Start the built app.
+- `bun run worker`
+  Start the background worker.
+- `bun run db:migrate`
+  Apply database migrations.
+- `bun run db:migrate:status`
+  Show migration status.
+- `bun run index:corpus`
+  Discover PDFs from `PDF_DATA_DIR`, chunk them, embed them, and store them in Postgres.
+- `bun run smoke:llm`
+  Run a simple LLM smoke test using the current `LLM_*` env vars.
+- `bun run test`
+  Run all tests.
+- `bun run test:unit`
+  Run unit tests.
+- `bun run test:integration`
+  Run integration tests.
+- `bun run test:e2e`
+  Run render/e2e-style tests.
+- `bun run check`
+  Run lint, typecheck, and tests.
+- `bun run scrape`
+  Run the scraping script.
 
 ## Notes
 
-- `LLM_BASE_URL` and `LLM_MODEL` are provider-plan specific; keep them environment-driven.
-- App uses retrieval citations and refuses fabricated evidence by system prompt policy.
-- In production runtime, `SESSION_SECRET` (>= 32 chars) and `DATABASE_URL` are required.
-- Optional: enable per-request x402 billing for `POST /api/chat` with `X402_ENABLED=true` and a funded `X402_PAY_TO` address.
-
-## Railway Prep (No Deployment Executed)
-
-Services:
-- Web service
-- Worker service
-- PostgreSQL service with `pgvector` enabled
-
-Build/start commands:
-- Build: `bun run build`
-- Web start: `bun run start`
-- Worker start: `bun run worker`
-
-Operational steps:
-- Set environment values from `.env.example` plus Railway `DATABASE_URL`
-- Run migrations: `bun run db:migrate`
-- Health check endpoint: `GET /api/health`
-- Ensure `data/` corpus is available to runtime (bundled or mounted volume)
+- `DATABASE_URL` is required for migrations and runtime DB access.
+- `PDF_DATA_DIR` controls which PDF folder `bun run index:corpus` scans.
+- `EMBEDDING_*` env vars control indexing and query embedding.
+- `LLM_*` env vars control answer generation.

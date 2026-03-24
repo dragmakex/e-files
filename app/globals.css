@@ -1,5 +1,5 @@
 :root {
-  --bg: #0f7f8c;
+  --bg: #0f95bd;
   --surface: #c4c0bc;
   --surface-raised: #dfdbd8;
   --text: #111111;
@@ -22,7 +22,8 @@ body {
 body {
   font-family: "MS Sans Serif", "Tahoma", sans-serif;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 45%),
+    radial-gradient(circle at top, rgba(175, 235, 255, 0.18), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 45%),
     var(--bg);
   color: var(--text);
 }
@@ -105,6 +106,79 @@ a:focus-visible {
   padding: 16px;
 }
 
+.landing-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.landing-card {
+  width: min(100%, 720px);
+}
+
+.landing-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.landing-titlebar-label {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.landing-titlebar-controls {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.landing-titlebar-button {
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  color: #111;
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border-light);
+  border-left: 1px solid var(--border-light);
+  border-right: 1px solid var(--border-deep);
+  border-bottom: 1px solid var(--border-deep);
+}
+
+.landing-titlebar-button-link {
+  text-decoration: none;
+}
+
+.landing-titlebar-button-link:visited {
+  color: #111;
+}
+
+.landing-copy {
+  padding: 28px 24px 32px;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 14px;
+}
+
+.landing-heading {
+  margin: 0;
+  font-size: clamp(32px, 6vw, 56px);
+  line-height: 1;
+}
+
+.landing-description {
+  margin: 0;
+  max-width: 42ch;
+  font-size: clamp(16px, 2.4vw, 20px);
+  line-height: 1.4;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -132,6 +206,10 @@ a:focus-visible {
 @media (max-width: 900px) {
   .container {
     padding: 12px;
+  }
+
+  .landing-copy {
+    padding: 24px 18px 28px;
   }
 
   .status-table {
