@@ -8,7 +8,6 @@ type DocumentRow = {
   documentId: string
   filename: string
   status: string
-  pageCount: number | null
 }
 
 const PAGE_SIZE = 25
@@ -57,7 +56,6 @@ export function CorpusListPanel() {
               <tr>
                 <th align="left">File</th>
                 <th align="left">Available</th>
-                <th align="left">Pages</th>
               </tr>
             </thead>
             <tbody>
@@ -65,12 +63,11 @@ export function CorpusListPanel() {
                 <tr key={document.documentId}>
                   <td>{document.filename}</td>
                   <td>{document.status === "ready" ? "Yes" : "No"}</td>
-                  <td>{document.pageCount ?? "-"}</td>
                 </tr>
               ))}
               {!loading && pagedDocuments.length === 0 ? (
                 <tr>
-                  <td colSpan={3}>No indexed PDFs found.</td>
+                  <td colSpan={2}>No indexed PDFs found.</td>
                 </tr>
               ) : null}
             </tbody>

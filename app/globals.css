@@ -119,7 +119,7 @@ a:focus-visible {
 }
 
 .corpus-card {
-  width: min(100%, 960px);
+  width: min(100%, 720px);
 }
 
 .landing-titlebar {
