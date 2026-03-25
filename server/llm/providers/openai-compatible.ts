@@ -14,19 +14,6 @@ const OpenAiCompatibleResponseSchema = Schema.Struct({
   usage: Schema.optional(Schema.Unknown)
 })
 
-const OpenAiCompatibleStreamChunkSchema = Schema.Struct({
-  choices: Schema.Array(
-    Schema.Struct({
-      delta: Schema.optional(
-        Schema.Struct({
-          content: Schema.optional(Schema.String)
-        })
-      )
-    })
-  ),
-  usage: Schema.optional(Schema.Unknown)
-})
-
 const UsageSchema = Schema.Struct({
   prompt_tokens: Schema.optional(Schema.Number),
   completion_tokens: Schema.optional(Schema.Number),
@@ -133,106 +120,6 @@ export const OpenAiCompatibleLlmProvider: LlmProvider = {
     }
 
     return requestWithRetry(input)
-  },
-  async streamGenerate(input: LlmGenerateInput, onDelta): Promise<LlmGenerateOutput> {
-    if (!env.llm.apiKey || !env.llm.baseUrl || !env.llm.model) {
-      throw new ExternalServiceError("OpenAI-compatible provider is not configured")
-    }
-
-    return withTimeout(async (signal) => {
-      const response = await fetch(`${env.llm.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.llm.apiKey}`,
-          "Content-Type": "application/json",
-          "x-request-id": input.requestId ?? ""
-        },
-        body: JSON.stringify({
-          model: env.llm.model,
-          messages: input.messages,
-          temperature: input.temperature ?? env.llm.temperature,
-          max_tokens: input.maxOutputTokens ?? env.llm.maxOutputTokens,
-          stream: true
-        }),
-        signal
-      })
-
-      if (!response.ok) {
-        throw new ExternalServiceError("OpenAI-compatible request failed", {
-          status: response.status,
-          body: await response.text()
-        })
-      }
-
-      if (!response.body) {
-        throw new ExternalServiceError("OpenAI-compatible stream body missing")
-      }
-
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ""
-      let text = ""
-      let usage: LlmGenerateOutput["usage"] | undefined
-
-      const processEvent = async (rawEvent: string): Promise<boolean> => {
-        for (const line of rawEvent.split(/\r?\n/)) {
-          if (!line.startsWith("data:")) continue
-          const payload = line.slice(5).trim()
-          if (!payload) continue
-          if (payload === "[DONE]") return true
-
-          const parsed = Schema.decodeUnknownSync(OpenAiCompatibleStreamChunkSchema)(JSON.parse(payload))
-          const delta = parsed.choices[0]?.delta?.content ?? ""
-          if (delta) {
-            text += delta
-            await onDelta(delta)
-          }
-          const decodedUsage = decodeUsage(parsed.usage)
-          if (decodedUsage) {
-            usage = {
-              inputTokens: decodedUsage.prompt_tokens,
-              outputTokens: decodedUsage.completion_tokens,
-              totalTokens: decodedUsage.total_tokens
-            }
-          }
-        }
-
-        return false
-      }
-
-      while (true) {
-        const { done, value } = await reader.read()
-        buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done })
-
-        let boundary = buffer.indexOf("\n\n")
-        while (boundary >= 0) {
-          const rawEvent = buffer.slice(0, boundary)
-          buffer = buffer.slice(boundary + 2)
-          const finished = await processEvent(rawEvent)
-          if (finished) {
-            return {
-              text,
-              usage,
-              providerRequestId: response.headers.get("x-request-id") ?? undefined
-            }
-          }
-          boundary = buffer.indexOf("\n\n")
-        }
-
-        if (done) {
-          if (buffer.trim()) {
-            await processEvent(buffer)
-          }
-          break
-        }
-      }
-
-      return {
-        text,
-        usage,
-        providerRequestId: response.headers.get("x-request-id") ?? undefined
-      }
-    }, env.llm.timeoutMs)
   },
   async healthcheck() {
     return { ok: Boolean(env.llm.apiKey && env.llm.baseUrl && env.llm.model) }

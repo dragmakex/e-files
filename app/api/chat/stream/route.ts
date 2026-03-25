@@ -57,6 +57,8 @@ export const POST = async (request: Request) => {
         void (async () => {
           try {
             send("meta", { requestId, threadId: body.threadId, userMessageId: userMessage.id })
+            send("status", { message: "Consulting the files" })
+            send("status", { message: "Looking through the indexed documents" })
 
             if (retrievalFailed) {
               const assistantMessage = await insertMessage({
@@ -66,7 +68,7 @@ export const POST = async (request: Request) => {
                 citations: [],
                 retrievalMeta: { candidateCount: 0, selectedCount: 0 }
               })
-              send("delta", { text: RETRIEVAL_FAILURE_RESPONSE })
+              send("status", { message: "Search failed" })
               send("done", {
                 threadId: body.threadId,
                 assistantMessageId: assistantMessage.id,
@@ -76,6 +78,9 @@ export const POST = async (request: Request) => {
               return
             }
 
+            send("status", { message: "Pulling the most relevant pages" })
+            send("status", { message: "Comparing overlapping evidence" })
+
             if (selected.length === 0) {
               const assistantMessage = await insertMessage({
                 threadId: body.threadId,
@@ -84,7 +89,7 @@ export const POST = async (request: Request) => {
                 citations: [],
                 retrievalMeta: { candidateCount: retrieved.length, selectedCount: 0 }
               })
-              send("delta", { text: NO_EVIDENCE_RESPONSE })
+              send("status", { message: "No usable passages found" })
               send("done", {
                 threadId: body.threadId,
                 assistantMessageId: assistantMessage.id,
@@ -95,34 +100,15 @@ export const POST = async (request: Request) => {
             }
 
             const provider = llmProvider()
-            let generatedText = ""
-
-            if (provider.streamGenerate) {
-              const streamed = await provider.streamGenerate(
-                {
-                  messages: [
-                    { role: "system", content: baseSystemPrompt },
-                    { role: "user", content: buildUserPrompt(body.question, selected) }
-                  ],
-                  requestId
-                },
-                async (delta) => {
-                  generatedText += delta
-                  send("delta", { text: delta })
-                }
-              )
-              generatedText = streamed.text
-            } else {
-              const generated = await provider.generate({
-                messages: [
-                  { role: "system", content: baseSystemPrompt },
-                  { role: "user", content: buildUserPrompt(body.question, selected) }
-                ],
-                requestId
-              })
-              generatedText = generated.text
-              send("delta", { text: generatedText })
-            }
+            send("status", { message: "Writing an answer from the selected files only" })
+            const generated = await provider.generate({
+              messages: [
+                { role: "system", content: baseSystemPrompt },
+                { role: "user", content: buildUserPrompt(body.question, selected) }
+              ],
+              requestId
+            })
+            const generatedText = generated.text
 
             const cleanedAnswer = stripThinkBlocks(generatedText || TEMPORARY_FAILURE_RESPONSE)
             const assistantMessage = await insertMessage({
@@ -136,6 +122,7 @@ export const POST = async (request: Request) => {
               }
             })
 
+            send("status", { message: "Answer ready" })
             send("done", {
               threadId: body.threadId,
               assistantMessageId: assistantMessage.id,

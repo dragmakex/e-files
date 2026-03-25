@@ -26,6 +26,7 @@ export function ChatShell() {
   const [messages, setMessages] = useState<ReadonlyArray<ChatMessage>>([])
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [loadingNote, setLoadingNote] = useState("Consulting the files")
 
   const refreshMessages = async (activeThreadId: string) => {
     const refreshed = await fetch(`/api/threads/${activeThreadId}/messages`)
@@ -44,14 +45,13 @@ export function ChatShell() {
   const onSend = async (question: string) => {
     if (!threadId) return
     const optimisticUserId = `tmp-user-${crypto.randomUUID()}`
-    const optimisticAssistantId = `tmp-assistant-${crypto.randomUUID()}`
     setMessages((previous) => [
       ...previous,
-      { id: optimisticUserId, role: "user", content: question },
-      { id: optimisticAssistantId, role: "assistant", content: "", pending: true }
+      { id: optimisticUserId, role: "user", content: question }
     ])
     setPending(true)
     setError(null)
+    setLoadingNote("Consulting the files")
 
     try {
       const response = await fetch("/api/chat/stream", {
@@ -61,7 +61,6 @@ export function ChatShell() {
       })
       if (!response.ok) {
         const body = await response.json()
-        setMessages((previous) => previous.filter((message) => message.id !== optimisticAssistantId))
         await refreshMessages(threadId)
         setError(body?.error?.message ?? "Request failed")
         return
@@ -70,20 +69,6 @@ export function ChatShell() {
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
       let buffer = ""
-
-      const applyDelta = (delta: string) => {
-        setMessages((previous) =>
-          previous.map((message) =>
-            message.id === optimisticAssistantId
-              ? {
-                  ...message,
-                  pending: false,
-                  content: `${message.content}${delta}`
-                }
-              : message
-          )
-        )
-      }
 
       const processEvent = async (rawEvent: string) => {
         let eventName = "message"
@@ -94,9 +79,10 @@ export function ChatShell() {
         }
         if (!data) return false
 
-        const payload = JSON.parse(data) as { text?: string; message?: string }
-        if (eventName === "delta" && payload.text) {
-          applyDelta(payload.text)
+        const payload = JSON.parse(data) as { message?: string }
+        if (eventName === "status" && payload.message) {
+          setLoadingNote(payload.message)
+          return false
         }
         if (eventName === "error") {
           setError(payload.message ?? "Request failed")
@@ -120,10 +106,7 @@ export function ChatShell() {
           const rawEvent = buffer.slice(0, boundary)
           buffer = buffer.slice(boundary + 2)
           const shouldStop = await processEvent(rawEvent)
-          if (shouldStop) {
-            setPending(false)
-            return
-          }
+          if (shouldStop) return
           boundary = buffer.indexOf("\n\n")
         }
 
@@ -133,11 +116,11 @@ export function ChatShell() {
       await refreshMessages(threadId)
       playUiAnswerReady()
     } catch {
-      setMessages((previous) => previous.filter((message) => message.id !== optimisticAssistantId))
       await refreshMessages(threadId)
       setError("Unexpected error while sending message")
     } finally {
       setPending(false)
+      setLoadingNote("Consulting the files")
     }
   }
 
@@ -149,6 +132,21 @@ export function ChatShell() {
       <SensitiveCorpusDisclaimer />
       {error ? <p style={{ color: "#b91c1c" }} role="alert" aria-live="assertive">{error}</p> : null}
       <MessageList messages={messages} />
+      {pending ? (
+        <div className="window chat-loading" role="status" aria-live="polite">
+          <div>
+            <div className="chat-loading-title">
+              {loadingNote}
+              <span className="chat-loading-dots" aria-hidden="true" />
+            </div>
+          </div>
+          <div className="win-spinner" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
+      ) : null}
       <MessageInput onSend={onSend} disabled={pending || !threadId} />
       </div>
     </section>

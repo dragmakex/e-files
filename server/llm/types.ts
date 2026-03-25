@@ -25,9 +25,5 @@ export type LlmGenerateOutput = {
 export interface LlmProvider {
   readonly name: string
   generate(input: LlmGenerateInput): Promise<LlmGenerateOutput>
-  streamGenerate?(
-    input: LlmGenerateInput,
-    onDelta: (text: string) => void | Promise<void>
-  ): Promise<LlmGenerateOutput>
   healthcheck?(): Promise<{ ok: boolean; detail?: string }>
 }
