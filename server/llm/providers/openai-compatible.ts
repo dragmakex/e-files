@@ -11,13 +11,7 @@ const OpenAiCompatibleResponseSchema = Schema.Struct({
       })
     })
   ),
-  usage: Schema.optional(
-    Schema.Struct({
-      prompt_tokens: Schema.optional(Schema.Number),
-      completion_tokens: Schema.optional(Schema.Number),
-      total_tokens: Schema.optional(Schema.Number)
-    })
-  )
+  usage: Schema.optional(Schema.Unknown)
 })
 
 const OpenAiCompatibleStreamChunkSchema = Schema.Struct({
@@ -30,14 +24,19 @@ const OpenAiCompatibleStreamChunkSchema = Schema.Struct({
       )
     })
   ),
-  usage: Schema.optional(
-    Schema.Struct({
-      prompt_tokens: Schema.optional(Schema.Number),
-      completion_tokens: Schema.optional(Schema.Number),
-      total_tokens: Schema.optional(Schema.Number)
-    })
-  )
+  usage: Schema.optional(Schema.Unknown)
 })
+
+const UsageSchema = Schema.Struct({
+  prompt_tokens: Schema.optional(Schema.Number),
+  completion_tokens: Schema.optional(Schema.Number),
+  total_tokens: Schema.optional(Schema.Number)
+})
+
+const decodeUsage = (value: unknown): { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined => {
+  if (value == null) return undefined
+  return Schema.decodeUnknownSync(UsageSchema)(value)
+}
 
 const withTimeout = async <T>(run: (signal: AbortSignal) => Promise<T>, timeoutMs: number): Promise<T> => {
   const controller = new AbortController()
@@ -97,12 +96,14 @@ const requestWithRetry = async (input: LlmGenerateInput): Promise<LlmGenerateOut
           throw new ExternalServiceError("Unexpected OpenAI-compatible response")
         }
 
+        const usage = decodeUsage(payload.usage)
+
         return {
           text,
           usage: {
-            inputTokens: payload.usage?.prompt_tokens,
-            outputTokens: payload.usage?.completion_tokens,
-            totalTokens: payload.usage?.total_tokens
+            inputTokens: usage?.prompt_tokens,
+            outputTokens: usage?.completion_tokens,
+            totalTokens: usage?.total_tokens
           },
           providerRequestId: response.headers.get("x-request-id") ?? undefined,
           raw: payload
@@ -186,11 +187,12 @@ export const OpenAiCompatibleLlmProvider: LlmProvider = {
             text += delta
             await onDelta(delta)
           }
-          if (parsed.usage) {
+          const decodedUsage = decodeUsage(parsed.usage)
+          if (decodedUsage) {
             usage = {
-              inputTokens: parsed.usage.prompt_tokens,
-              outputTokens: parsed.usage.completion_tokens,
-              totalTokens: parsed.usage.total_tokens
+              inputTokens: decodedUsage.prompt_tokens,
+              outputTokens: decodedUsage.completion_tokens,
+              totalTokens: decodedUsage.total_tokens
             }
           }
         }
