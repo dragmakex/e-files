@@ -4,7 +4,11 @@ import "@/app/globals.css"
 
 export const metadata: Metadata = {
   title: "Stickystein",
-  description: "Ask questions over the Epstein PDFs with citations."
+  description: "Ask questions over the Epstein PDFs with citations.",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg"
+  }
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
