@@ -4,10 +4,12 @@ export function CitationList({ citations }: { citations?: ReadonlyArray<Citation
   if (!citations || citations.length === 0) return null
 
   return (
-    <ul className="citation-list">
+    <div className="citation-list-shell">
+      <ul className="citation-list">
       {citations.map((citation) => (
         <CitationItem key={citation.chunkId} citation={citation} />
       ))}
-    </ul>
+      </ul>
+    </div>
   )
 }
