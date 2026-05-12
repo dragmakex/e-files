@@ -4,11 +4,25 @@ import { ForbiddenError, RateLimitError, ValidationError } from "@/lib/errors"
 import { errorResponse, ok } from "@/lib/http"
 import { createChatPostHandler, type ChatPostDependencies } from "@/app/api/chat/route"
 
+const makeUser = (id: string) =>
+  ({
+    id,
+    name: "User One",
+    email: "user@example.com",
+    emailVerified: true,
+    image: null,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    queryCredits: 5,
+    stripeCustomerId: null
+  }) as const
+
 const makeDeps = (overrides: Partial<ChatPostDependencies> = {}): ChatPostDependencies => ({
   requestIdFromRequest: () => "req_test",
   parseJsonBody: async () => ({ threadId: "thread_1", question: "What happened?" }),
   decodeChatRequest: (input) => input as { threadId: string; question: string },
-  getOrCreateSession: async () => ({ sessionKey: "session_key_1", sessionId: "session_1" }),
+  requireCurrentUser: async () => makeUser("user_1"),
+  consumeQueryCredit: async () => 4,
   assertThreadOwnership: async () => {},
   clientIpFromRequest: () => "203.0.113.10",
   enforceRateLimit: async () => {},
@@ -44,7 +58,7 @@ test("chat api returns grounded payload on success", async () => {
 
   expect(response.status).toBe(200)
   expect(response.headers.get("x-request-id")).toBe("req_test")
-  expect(captured).toEqual([{ subjectKey: "203.0.113.10:session_1", routeKey: "chat", windowSec: 60, max: 10 }])
+  expect(captured).toEqual([{ subjectKey: "203.0.113.10:user_1", routeKey: "chat", windowSec: 60, max: 10 }])
   expect(await response.json()).toEqual({
     threadId: "thread_1",
     userMessageId: "msg_user_1",
@@ -82,7 +96,7 @@ test("chat api enforces thread ownership checks", async () => {
   const handler = createChatPostHandler(
     makeDeps({
       assertThreadOwnership: async () => {
-        throw new ForbiddenError("Thread does not belong to this session")
+        throw new ForbiddenError("Thread does not belong to this user")
       }
     })
   )
@@ -97,7 +111,7 @@ test("chat api enforces thread ownership checks", async () => {
 
   expect(response.status).toBe(403)
   expect(await response.json()).toEqual({
-    error: { code: "forbidden", message: "Thread does not belong to this session" }
+    error: { code: "forbidden", message: "Thread does not belong to this user" }
   })
 })
 

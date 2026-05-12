@@ -94,8 +94,34 @@ export const replaceDocumentPages = async (
   })
 }
 
-export const listDocumentsWithLatestJob = async (): Promise<ReadonlyArray<Record<string, unknown>>> => {
-  return withDb(async (sql) => sql`
+export type LatestDocumentJobRow = {
+  readonly documentId: string
+  readonly filename: string
+  readonly status: DocumentRecord["status"]
+  readonly pageCount: number | null
+  readonly lastIndexedAt: string | null
+  readonly jobId: string | null
+  readonly jobStatus: string | null
+  readonly jobProgress: number | null
+}
+
+export type ListDocumentsOptions = {
+  readonly limit?: number
+  readonly offset?: number
+}
+
+export const countDocuments = async (): Promise<number> => {
+  return withDb(async (sql) => {
+    const [row] = await sql<{ count: string }[]>`SELECT count(*)::text as count FROM documents`
+    return Number(row?.count ?? 0)
+  })
+}
+
+export const listDocumentsWithLatestJob = async (opts: ListDocumentsOptions = {}): Promise<ReadonlyArray<LatestDocumentJobRow>> => {
+  const limit = opts.limit ?? 100
+  const offset = opts.offset ?? 0
+
+  return withDb(async (sql) => sql<LatestDocumentJobRow[]>`
     SELECT
       d.id as "documentId",
       d.filename,
@@ -114,5 +140,7 @@ export const listDocumentsWithLatestJob = async (): Promise<ReadonlyArray<Record
       LIMIT 1
     ) j ON true
     ORDER BY d.updated_at DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
   `)
 }

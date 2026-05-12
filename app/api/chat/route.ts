@@ -1,9 +1,10 @@
 import { env } from "@/lib/env"
-import { toAppError } from "@/lib/errors"
+import { PaymentRequiredError, toAppError } from "@/lib/errors"
 import { errorResponse, ok, parseJsonBody, requestIdFromRequest } from "@/lib/http"
 import { clientIpFromRequest } from "@/lib/security/request"
 import { decodeChatRequest } from "@/lib/validation/chat"
-import { getOrCreateSession } from "@/server/chat/sessions"
+import { requireCurrentUser } from "@/server/auth"
+import { consumeQueryCredit } from "@/server/repositories/chat-repo"
 import { assertThreadOwnership } from "@/server/chat/threads"
 import { answerQuestion } from "@/server/rag/answer-orchestrator"
 import { enforceRateLimit } from "@/server/rate-limit/limiter"
@@ -14,7 +15,8 @@ export type ChatPostDependencies = {
   readonly requestIdFromRequest: typeof requestIdFromRequest
   readonly parseJsonBody: typeof parseJsonBody
   readonly decodeChatRequest: typeof decodeChatRequest
-  readonly getOrCreateSession: typeof getOrCreateSession
+  readonly requireCurrentUser: typeof requireCurrentUser
+  readonly consumeQueryCredit: typeof consumeQueryCredit
   readonly assertThreadOwnership: typeof assertThreadOwnership
   readonly clientIpFromRequest: typeof clientIpFromRequest
   readonly enforceRateLimit: typeof enforceRateLimit
@@ -27,7 +29,8 @@ const liveDependencies: ChatPostDependencies = {
   requestIdFromRequest,
   parseJsonBody,
   decodeChatRequest,
-  getOrCreateSession,
+  requireCurrentUser,
+  consumeQueryCredit,
   assertThreadOwnership,
   clientIpFromRequest,
   enforceRateLimit,
@@ -45,19 +48,27 @@ const handleChatPost = Effect.fn("ChatRoute.POST")(function* (request: Request, 
     try: () => deps.decodeChatRequest(rawBody),
     catch: toAppError
   })
-  const session = yield* Effect.tryPromise({
-    try: () => deps.getOrCreateSession(),
+  const user = yield* Effect.tryPromise({
+    try: () => deps.requireCurrentUser(),
     catch: toAppError
   })
   yield* Effect.tryPromise({
-    try: () => deps.assertThreadOwnership(body.threadId, session.sessionId),
+    try: () => deps.assertThreadOwnership(body.threadId, user.id),
     catch: toAppError
   })
+
+  const remainingCredits = yield* Effect.tryPromise({
+    try: () => deps.consumeQueryCredit(user.id),
+    catch: toAppError
+  })
+  if (remainingCredits === null) {
+    return yield* Effect.fail(new PaymentRequiredError("No queries remaining. Buy a $1 pack for 5 more queries."))
+  }
 
   yield* Effect.tryPromise({
     try: () =>
       deps.enforceRateLimit({
-        subjectKey: subjectKey(deps.clientIpFromRequest(request), session.sessionId),
+        subjectKey: subjectKey(deps.clientIpFromRequest(request), user.id),
         routeKey: routeKeys.chat,
         windowSec: env.rateLimit.chatWindowSec,
         max: env.rateLimit.chatMax

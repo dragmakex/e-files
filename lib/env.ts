@@ -5,7 +5,6 @@ const EnvSchema = Schema.Struct({
   NODE_ENV: Schema.optional(Schema.String),
   APP_BASE_URL: Schema.optional(Schema.String),
   LOG_LEVEL: Schema.optional(Schema.String),
-  SESSION_SECRET: Schema.optional(Schema.String),
   DATABASE_URL: Schema.optional(Schema.String),
   PDF_DATA_DIR: Schema.optional(Schema.String),
   PDF_PREPROCESS_COMMAND: Schema.optional(Schema.String),
@@ -19,7 +18,16 @@ const EnvSchema = Schema.Struct({
   EMBEDDING_MODEL: Schema.optional(Schema.String),
   EMBEDDING_TIMEOUT_MS: Schema.optional(Schema.String),
   EMBEDDING_BATCH_SIZE: Schema.optional(Schema.String),
-  ADMIN_INGEST_TOKEN: Schema.optional(Schema.String)
+  ADMIN_INGEST_TOKEN: Schema.optional(Schema.String),
+  STRIPE_SECRET_KEY: Schema.optional(Schema.String),
+  STRIPE_WEBHOOK_SECRET: Schema.optional(Schema.String),
+  STRIPE_PRICE_CENTS: Schema.optional(Schema.String),
+  STRIPE_QUERIES_PER_PACK: Schema.optional(Schema.String),
+  BETTER_AUTH_SECRET: Schema.optional(Schema.String),
+  TWITTER_CLIENT_ID: Schema.optional(Schema.String),
+  TWITTER_CLIENT_SECRET: Schema.optional(Schema.String),
+  RESEND_API_KEY: Schema.optional(Schema.String),
+  AUTH_EMAIL_FROM: Schema.optional(Schema.String)
 })
 
 const numberFromEnv = (value: string | undefined, fallback: number): number => {
@@ -67,18 +75,16 @@ const ensureHttpUrl = (name: string, value: string): string => {
   return value
 }
 
-export const parseEnvironment = (processEnv: NodeJS.ProcessEnv, fallbackSessionSecret?: string) => {
+export const parseEnvironment = (processEnv: NodeJS.ProcessEnv) => {
   const parsedRaw = Schema.decodeUnknownSync(EnvSchema)(processEnv)
   const nodeEnv = oneOf("NODE_ENV", parsedRaw.NODE_ENV, "development", ["development", "test", "production"])
   const isNextProductionBuild = processEnv.NEXT_PHASE === "phase-production-build"
   const logLevel = oneOf("LOG_LEVEL", parsedRaw.LOG_LEVEL, "info", ["debug", "info", "warn", "error"])
-  const sessionSecret = parsedRaw.SESSION_SECRET ?? fallbackSessionSecret ?? randomBytes(32).toString("hex")
 
   const output = {
     nodeEnv,
     appBaseUrl: ensureHttpUrl("APP_BASE_URL", parsedRaw.APP_BASE_URL ?? "http://localhost:3000"),
     logLevel,
-    sessionSecret,
     databaseUrl: parsedRaw.DATABASE_URL ?? "",
     pdfDataDir: parsedRaw.PDF_DATA_DIR ?? "data",
     pdfPreprocessCommand: parsedRaw.PDF_PREPROCESS_COMMAND ?? "",
@@ -123,7 +129,20 @@ export const parseEnvironment = (processEnv: NodeJS.ProcessEnv, fallbackSessionS
       retryBaseMs: parseInteger("JOB_RETRY_BASE_MS", processEnv.JOB_RETRY_BASE_MS, 5000),
       retryMaxMs: parseInteger("JOB_RETRY_MAX_MS", processEnv.JOB_RETRY_MAX_MS, 60000)
     },
-    adminIngestToken: parsedRaw.ADMIN_INGEST_TOKEN ?? ""
+    adminIngestToken: parsedRaw.ADMIN_INGEST_TOKEN ?? "",
+    stripe: {
+      secretKey: parsedRaw.STRIPE_SECRET_KEY ?? "",
+      webhookSecret: parsedRaw.STRIPE_WEBHOOK_SECRET ?? "",
+      priceCents: parseInteger("STRIPE_PRICE_CENTS", processEnv.STRIPE_PRICE_CENTS, 100),
+      queriesPerPack: parseInteger("STRIPE_QUERIES_PER_PACK", processEnv.STRIPE_QUERIES_PER_PACK, 5)
+    },
+    auth: {
+      secret: parsedRaw.BETTER_AUTH_SECRET ?? randomBytes(32).toString("hex"),
+      twitterClientId: parsedRaw.TWITTER_CLIENT_ID ?? "",
+      twitterClientSecret: parsedRaw.TWITTER_CLIENT_SECRET ?? "",
+      resendApiKey: parsedRaw.RESEND_API_KEY ?? "",
+      emailFrom: parsedRaw.AUTH_EMAIL_FROM ?? ""
+    }
   }
 
   if (output.rag.chunkOverlap >= output.rag.chunkSize) {
@@ -137,8 +156,8 @@ export const parseEnvironment = (processEnv: NodeJS.ProcessEnv, fallbackSessionS
   }
 
   if (output.nodeEnv === "production" && !isNextProductionBuild) {
-    if (!parsedRaw.SESSION_SECRET || parsedRaw.SESSION_SECRET.length < 32) {
-      throw new Error("SESSION_SECRET is required in production and must be at least 32 characters")
+    if (output.auth.secret.length < 32 || !parsedRaw.BETTER_AUTH_SECRET) {
+      throw new Error("BETTER_AUTH_SECRET is required in production and must be at least 32 characters")
     }
     if (!parsedRaw.DATABASE_URL) {
       throw new Error("DATABASE_URL is required in production")
@@ -148,4 +167,4 @@ export const parseEnvironment = (processEnv: NodeJS.ProcessEnv, fallbackSessionS
   return output
 }
 
-export const env = parseEnvironment(process.env, randomBytes(32).toString("hex"))
+export const env = parseEnvironment(process.env)

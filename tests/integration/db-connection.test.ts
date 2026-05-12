@@ -12,9 +12,13 @@ const requiredTables = [
   "document_pages",
   "document_chunks",
   "index_jobs",
-  "chat_sessions",
   "chat_threads",
   "chat_messages",
+  "users",
+  "user_sessions",
+  "accounts",
+  "verifications",
+  "billing_events",
   "rate_limit_buckets",
   "schema_migrations"
 ]
@@ -25,7 +29,11 @@ const requiredIndexes = [
   "idx_chat_messages_thread_created",
   "idx_index_jobs_status_scheduled",
   "idx_document_chunks_text_fts",
-  "idx_document_chunks_embedding"
+  "idx_document_chunks_embedding",
+  "chat_threads_user_id_idx",
+  "user_sessions_userId_idx",
+  "accounts_userId_idx",
+  "verifications_identifier_idx"
 ]
 
 let migrationsEnsured = false

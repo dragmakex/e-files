@@ -3,8 +3,8 @@ import { toAppError } from "@/lib/errors"
 import { errorResponse, ok, parseJsonBody, requestIdFromRequest } from "@/lib/http"
 import { clientIpFromRequest } from "@/lib/security/request"
 import { decodeCreateThreadRequest } from "@/lib/validation/threads"
-import { getOrCreateSession } from "@/server/chat/sessions"
-import { createThreadForSession } from "@/server/chat/threads"
+import { requireCurrentUser } from "@/server/auth"
+import { createThreadForUser } from "@/server/chat/threads"
 import { enforceRateLimit } from "@/server/rate-limit/limiter"
 import { routeKeys, subjectKey } from "@/server/rate-limit/keys"
 import { Effect } from "effect"
@@ -13,10 +13,10 @@ export type ThreadsPostDependencies = {
   readonly requestIdFromRequest: typeof requestIdFromRequest
   readonly parseJsonBody: typeof parseJsonBody
   readonly decodeCreateThreadRequest: typeof decodeCreateThreadRequest
-  readonly getOrCreateSession: typeof getOrCreateSession
+  readonly requireCurrentUser: typeof requireCurrentUser
   readonly clientIpFromRequest: typeof clientIpFromRequest
   readonly enforceRateLimit: typeof enforceRateLimit
-  readonly createThreadForSession: typeof createThreadForSession
+  readonly createThreadForUser: typeof createThreadForUser
   readonly ok: typeof ok
   readonly errorResponse: typeof errorResponse
 }
@@ -25,10 +25,10 @@ const liveDependencies: ThreadsPostDependencies = {
   requestIdFromRequest,
   parseJsonBody,
   decodeCreateThreadRequest,
-  getOrCreateSession,
+  requireCurrentUser,
   clientIpFromRequest,
   enforceRateLimit,
-  createThreadForSession,
+  createThreadForUser,
   ok,
   errorResponse
 }
@@ -42,15 +42,15 @@ const handleThreadsPost = Effect.fn("ThreadsRoute.POST")(function* (request: Req
     try: () => deps.decodeCreateThreadRequest(rawBody),
     catch: toAppError
   })
-  const session = yield* Effect.tryPromise({
-    try: () => deps.getOrCreateSession(),
+  const user = yield* Effect.tryPromise({
+    try: () => deps.requireCurrentUser(),
     catch: toAppError
   })
 
   yield* Effect.tryPromise({
     try: () =>
       deps.enforceRateLimit({
-        subjectKey: subjectKey(deps.clientIpFromRequest(request), session.sessionId),
+        subjectKey: subjectKey(deps.clientIpFromRequest(request), user.id),
         routeKey: routeKeys.createThread,
         windowSec: env.rateLimit.threadsWindowSec,
         max: env.rateLimit.threadsMax
@@ -59,7 +59,7 @@ const handleThreadsPost = Effect.fn("ThreadsRoute.POST")(function* (request: Req
   })
 
   const thread = yield* Effect.tryPromise({
-    try: () => deps.createThreadForSession(session.sessionId, body.title),
+    try: () => deps.createThreadForUser(user.id, body.title),
     catch: toAppError
   })
 

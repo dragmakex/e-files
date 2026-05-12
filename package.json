@@ -24,12 +24,16 @@
   },
   "dependencies": {
     "@effect/platform": "latest",
+    "better-auth": "^1.6.3",
     "effect": "latest",
     "next": "latest",
     "pdf-parse": "latest",
+    "pg": "^8.20.0",
     "postgres": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "resend": "^6.11.0",
+    "stripe": "^22.0.1"
   },
   "devDependencies": {
     "@effect/language-service": "latest",

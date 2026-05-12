@@ -51,6 +51,7 @@ const makeDocumentsDeps = (overrides: Partial<IndexDocumentsGetDependencies> = {
       jobProgress: 100
     }
   ],
+  countDocuments: async () => 1,
   ok,
   errorResponse,
   ...overrides
@@ -171,7 +172,13 @@ test("index documents api returns mapped rows", async () => {
           progress: 100
         }
       }
-    ]
+    ],
+    pagination: {
+      page: 1,
+      pageSize: 25,
+      totalCount: 1,
+      totalPages: 1
+    }
   })
 })
 

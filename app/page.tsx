@@ -1,4 +1,6 @@
 import Link from "next/link"
+import { AuthPanel } from "@/components/auth/auth-panel"
+import { BillingPanel } from "@/components/billing/billing-panel"
 import { CorpusListPanel } from "@/components/chat/corpus-list-panel"
 import { SecondaryButtonLink } from "@/components/ui/button"
 
@@ -32,6 +34,8 @@ export default function HomePage() {
           <SecondaryButtonLink href="/chat">Open chat</SecondaryButtonLink>
         </div>
       </section>
+      <AuthPanel />
+      <BillingPanel />
       <CorpusListPanel />
     </main>
   )

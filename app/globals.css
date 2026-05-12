@@ -265,6 +265,58 @@ a:focus-visible {
   gap: 12px;
 }
 
+.billing-panel {
+  width: min(100%, 720px);
+}
+
+.auth-panel {
+  width: min(100%, 720px);
+}
+
+.billing-panel-compact {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.auth-panel-compact {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.billing-panel-body {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.auth-panel-body {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.auth-email-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.auth-email-input {
+  min-width: 220px;
+  flex: 1 1 240px;
+}
+
+.billing-meta {
+  margin: 0;
+  font-size: 13px;
+}
+
+.billing-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 12px;
+}
+
 .corpus-panel-header {
   display: flex;
   justify-content: space-between;
@@ -568,6 +620,10 @@ a:focus-visible {
 
   .chat-input-submit {
     width: 100%;
+  }
+
+  .auth-email-form {
+    flex-direction: column;
   }
 
   .status-table {

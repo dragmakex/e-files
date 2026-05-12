@@ -4,20 +4,33 @@ import { createThreadsPostHandler, type ThreadsPostDependencies } from "@/app/ap
 import { RateLimitError, ValidationError } from "@/lib/errors"
 import { errorResponse, ok } from "@/lib/http"
 
+const makeUser = (id: string) =>
+  ({
+    id,
+    name: "User One",
+    email: "user@example.com",
+    emailVerified: true,
+    image: null,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    queryCredits: 5,
+    stripeCustomerId: null
+  }) as const
+
 const makeDeps = (overrides: Partial<ThreadsPostDependencies> = {}): ThreadsPostDependencies => ({
   requestIdFromRequest: () => "req_threads",
   parseJsonBody: async () => ({ title: "Thread A" }),
   decodeCreateThreadRequest: (input) => input as { title?: string },
-  getOrCreateSession: async () => ({ sessionKey: "session_key_1", sessionId: "session_1" }),
+  requireCurrentUser: async () => makeUser("user_1"),
   clientIpFromRequest: () => "198.51.100.7",
   enforceRateLimit: async () => {},
-  createThreadForSession: async (_sessionId, title) => ({ id: "thr_1", title: title ?? "New Thread", createdAt: "2026-02-25T00:00:00.000Z" }),
+  createThreadForUser: async (_userId, title) => ({ id: "thr_1", title: title ?? "New Thread", createdAt: "2026-02-25T00:00:00.000Z" }),
   ok,
   errorResponse,
   ...overrides
 })
 
-test("threads api creates a thread and returns rate-limit keyed by session", async () => {
+test("threads api creates a thread and returns rate-limit keyed by user", async () => {
   const captured: Array<{ subjectKey: string; routeKey: string; windowSec: number; max: number }> = []
   const handler = createThreadsPostHandler(
     makeDeps({
@@ -37,7 +50,7 @@ test("threads api creates a thread and returns rate-limit keyed by session", asy
 
   expect(response.status).toBe(200)
   expect(response.headers.get("x-request-id")).toBe("req_threads")
-  expect(captured).toEqual([{ subjectKey: "198.51.100.7:session_1", routeKey: "threads-create", windowSec: 60, max: 20 }])
+  expect(captured).toEqual([{ subjectKey: "198.51.100.7:user_1", routeKey: "threads-create", windowSec: 60, max: 20 }])
   expect(await response.json()).toEqual({
     threadId: "thr_1",
     title: "Thread A",

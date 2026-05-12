@@ -2,7 +2,7 @@ import { errorResponse, ok, requestIdFromRequest } from "@/lib/http"
 import { ValidationError, toAppError } from "@/lib/errors"
 import { decodeMessageCursor, encodeMessageCursor } from "@/lib/utils/pagination"
 import { decodeMessagesQuery, decodeThreadParams } from "@/lib/validation/threads"
-import { getOrCreateSession } from "@/server/chat/sessions"
+import { requireCurrentUser } from "@/server/auth"
 import { listThreadMessages } from "@/server/chat/messages"
 import { assertThreadOwnership } from "@/server/chat/threads"
 import { Effect } from "effect"
@@ -12,7 +12,7 @@ export type ThreadMessagesGetDependencies = {
   readonly decodeThreadParams: typeof decodeThreadParams
   readonly decodeMessagesQuery: typeof decodeMessagesQuery
   readonly decodeMessageCursor: typeof decodeMessageCursor
-  readonly getOrCreateSession: typeof getOrCreateSession
+  readonly requireCurrentUser: typeof requireCurrentUser
   readonly assertThreadOwnership: typeof assertThreadOwnership
   readonly listThreadMessages: typeof listThreadMessages
   readonly encodeMessageCursor: typeof encodeMessageCursor
@@ -25,7 +25,7 @@ const liveDependencies: ThreadMessagesGetDependencies = {
   decodeThreadParams,
   decodeMessagesQuery,
   decodeMessageCursor,
-  getOrCreateSession,
+  requireCurrentUser,
   assertThreadOwnership,
   listThreadMessages,
   encodeMessageCursor,
@@ -64,12 +64,12 @@ const handleThreadMessagesGet = Effect.fn("ThreadMessagesRoute.GET")(function* (
     return yield* Effect.fail(new ValidationError("Invalid cursor"))
   }
 
-  const session = yield* Effect.tryPromise({
-    try: () => deps.getOrCreateSession(),
+  const user = yield* Effect.tryPromise({
+    try: () => deps.requireCurrentUser(),
     catch: toAppError
   })
   yield* Effect.tryPromise({
-    try: () => deps.assertThreadOwnership(params.threadId, session.sessionId),
+    try: () => deps.assertThreadOwnership(params.threadId, user.id),
     catch: toAppError
   })
 

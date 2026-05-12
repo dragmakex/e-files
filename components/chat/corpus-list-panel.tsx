@@ -10,43 +10,59 @@ type DocumentRow = {
   status: string
 }
 
+type DocumentsResponse = {
+  documents?: ReadonlyArray<DocumentRow>
+  pagination?: {
+    totalCount?: number
+    totalPages?: number
+  }
+}
+
 const PAGE_SIZE = 25
 
 export function CorpusListPanel() {
   const [documents, setDocuments] = useState<ReadonlyArray<DocumentRow>>([])
   const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    const controller = new AbortController()
+    setLoading(true)
+    setError(null)
+
     void (async () => {
       try {
-        const response = await fetch("/api/index/documents", { cache: "no-store" })
-        const body = await response.json()
+        const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) })
+        const response = await fetch(`/api/index/documents?${params.toString()}`, { cache: "no-store", signal: controller.signal })
+        const body = (await response.json()) as DocumentsResponse & { error?: { message?: string } }
         if (!response.ok) {
           throw new Error(body?.error?.message ?? "Could not load indexed PDFs")
         }
         setDocuments(body.documents ?? [])
+        setTotalCount(body.pagination?.totalCount ?? 0)
+        setTotalPages(body.pagination?.totalPages ?? 1)
       } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return
         setError(err instanceof Error ? err.message : "Could not load indexed PDFs")
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) setLoading(false)
       }
     })()
-  }, [])
 
-  const totalPages = Math.max(1, Math.ceil(documents.length / PAGE_SIZE))
-  const start = (page - 1) * PAGE_SIZE
-  const end = start + PAGE_SIZE
+    return () => controller.abort()
+  }, [page])
 
-  const pagedDocuments = useMemo(() => documents.slice(start, end), [documents, start, end])
+  const pagedDocuments = useMemo(() => documents, [documents])
 
   return (
     <section className="window corpus-card">
       <div className="window-title">Indexed PDFs</div>
       <div className="corpus-panel">
         <div className="corpus-panel-header">
-          <p className="corpus-meta">{loading ? "Loading..." : `${documents.length} indexed PDFs`}</p>
+          <p className="corpus-meta">{loading ? "Loading..." : `${totalCount} indexed PDFs`}</p>
           <p className="corpus-meta">Page {page} of {totalPages}</p>
         </div>
         {error ? <p style={{ color: "#b91c1c", margin: 0 }}>{error}</p> : null}

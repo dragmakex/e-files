@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react"
 
+import { AuthPanel } from "@/components/auth/auth-panel"
+import { BillingPanel } from "@/components/billing/billing-panel"
 import { MessageInput } from "@/components/chat/message-input"
 import { MessageList } from "@/components/chat/message-list"
 import { SensitiveCorpusDisclaimer } from "@/components/chat/sensitive-corpus-disclaimer"
+import { authClient } from "@/lib/auth"
 import { playUiAnswerReady } from "@/lib/ui/sound"
 
 type ChatMessage = {
@@ -22,6 +25,7 @@ type ChatMessage = {
 }
 
 export function ChatShell() {
+  const { data: authSession, isPending: authPending } = authClient.useSession()
   const [threadId, setThreadId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ReadonlyArray<ChatMessage>>([])
   const [pending, setPending] = useState(false)
@@ -44,12 +48,24 @@ export function ChatShell() {
   }
 
   useEffect(() => {
+    if (!authSession?.user) {
+      setThreadId(null)
+      setMessages([])
+      setPending(false)
+      return
+    }
+    if (threadId) return
+
     void (async () => {
       const response = await fetch("/api/threads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })
       const body = await response.json()
-      setThreadId(body.threadId)
+      if (response.ok && body?.threadId) {
+        setThreadId(body.threadId)
+        return
+      }
+      setError(body?.error?.message ?? "Could not open a thread")
     })()
-  }, [])
+  }, [authSession?.user?.id, threadId])
 
   useEffect(() => {
     if (!pending) {
@@ -167,7 +183,10 @@ export function ChatShell() {
       <h2 className="window-title">Chat</h2>
       <div className="chat-shell-body">
         <h3 id="chat-panel-title" className="sr-only">Chat conversation panel</h3>
+        <AuthPanel compact />
+        <BillingPanel compact />
         <SensitiveCorpusDisclaimer />
+        {!authSession?.user ? <p className="chat-error">{authPending ? "Checking sign-in..." : "Sign in before starting a chat."}</p> : null}
         {error ? <p className="chat-error" role="alert" aria-live="assertive">{error}</p> : null}
         <MessageList messages={messages} />
         {pending ? (
@@ -185,7 +204,7 @@ export function ChatShell() {
             </div>
           </div>
         ) : null}
-        <MessageInput onSend={onSend} disabled={pending || !threadId} />
+        <MessageInput onSend={onSend} disabled={pending || !threadId || !authSession?.user} />
       </div>
     </section>
   )

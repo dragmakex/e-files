@@ -1,10 +1,10 @@
 import { env } from "@/lib/env"
-import { toAppError } from "@/lib/errors"
+import { PaymentRequiredError, toAppError } from "@/lib/errors"
 import { parseJsonBody, requestIdFromRequest } from "@/lib/http"
 import { securityHeaders } from "@/lib/security/headers"
 import { clientIpFromRequest } from "@/lib/security/request"
 import { decodeChatRequest } from "@/lib/validation/chat"
-import { getOrCreateSession } from "@/server/chat/sessions"
+import { requireCurrentUser } from "@/server/auth"
 import { assertThreadOwnership } from "@/server/chat/threads"
 import { llmProvider } from "@/server/llm/client"
 import { baseSystemPrompt, buildUserPrompt } from "@/server/llm/prompts"
@@ -13,7 +13,7 @@ import { routeKeys, subjectKey } from "@/server/rate-limit/keys"
 import { toCitation } from "@/server/rag/citations"
 import { assembleContextChunks } from "@/server/rag/context-assembly"
 import { hybridRetrieve } from "@/server/rag/retrieval"
-import { insertMessage } from "@/server/repositories/chat-repo"
+import { consumeQueryCredit, insertMessage } from "@/server/repositories/chat-repo"
 import { stripThinkBlocks } from "@/lib/utils/text"
 
 const NO_EVIDENCE_RESPONSE = "I could not find enough evidence in the indexed documents. Please try a more specific question."
@@ -23,19 +23,24 @@ const TEMPORARY_FAILURE_RESPONSE = "I could not complete answer generation right
 const sseEvent = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
 
 export const POST = async (request: Request) => {
-  const requestId = requestIdFromRequest(request)
+    const requestId = requestIdFromRequest(request)
 
   try {
     const rawBody = await parseJsonBody(request, { maxBytes: 16 * 1024 })
     const body = decodeChatRequest(rawBody)
-    const session = await getOrCreateSession()
-    await assertThreadOwnership(body.threadId, session.sessionId)
+    const user = await requireCurrentUser()
+    await assertThreadOwnership(body.threadId, user.id)
     await enforceRateLimit({
-      subjectKey: subjectKey(clientIpFromRequest(request), session.sessionId),
+      subjectKey: subjectKey(clientIpFromRequest(request), user.id),
       routeKey: routeKeys.chat,
       windowSec: env.rateLimit.chatWindowSec,
       max: env.rateLimit.chatMax
     })
+
+    const remainingCredits = await consumeQueryCredit(user.id)
+    if (remainingCredits === null) {
+      throw new PaymentRequiredError("No queries remaining. Buy a $1 pack for 5 more queries.")
+    }
 
     const userMessage = await insertMessage({ threadId: body.threadId, role: "user", content: body.question })
 

@@ -6,12 +6,25 @@ import { errorResponse, ok } from "@/lib/http"
 import { decodeMessageCursor, encodeMessageCursor } from "@/lib/utils/pagination"
 import { decodeMessagesQuery, decodeThreadParams } from "@/lib/validation/threads"
 
+const makeUser = (id: string) =>
+  ({
+    id,
+    name: "User One",
+    email: "user@example.com",
+    emailVerified: true,
+    image: null,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    queryCredits: 5,
+    stripeCustomerId: null
+  }) as const
+
 const makeDeps = (overrides: Partial<ThreadMessagesGetDependencies> = {}): ThreadMessagesGetDependencies => ({
   requestIdFromRequest: () => "req_messages",
   decodeThreadParams,
   decodeMessagesQuery,
   decodeMessageCursor,
-  getOrCreateSession: async () => ({ sessionKey: "session_key_1", sessionId: "session_1" }),
+  requireCurrentUser: async () => makeUser("user_1"),
   assertThreadOwnership: async () => {},
   listThreadMessages: async () => [],
   encodeMessageCursor,
@@ -80,7 +93,7 @@ test("thread messages api enforces ownership", async () => {
   const response = await createThreadMessagesGetHandler(
     makeDeps({
       assertThreadOwnership: async () => {
-        throw new ForbiddenError("Thread does not belong to this session")
+        throw new ForbiddenError("Thread does not belong to this user")
       }
     })
   )(
@@ -90,6 +103,6 @@ test("thread messages api enforces ownership", async () => {
 
   expect(response.status).toBe(403)
   expect(await response.json()).toEqual({
-    error: { code: "forbidden", message: "Thread does not belong to this session" }
+    error: { code: "forbidden", message: "Thread does not belong to this user" }
   })
 })

@@ -1,13 +1,13 @@
 import { ForbiddenError } from "@/lib/errors"
-import { createThread, getThreadSessionId } from "@/server/repositories/chat-repo"
+import { createThread, getThreadUserId } from "@/server/repositories/chat-repo"
 
-export const createThreadForSession = async (sessionId: string, title?: string) => {
-  return createThread(sessionId, title?.trim() || "New Thread")
+export const createThreadForUser = async (userId: string, title?: string) => {
+  return createThread(userId, title?.trim() || "New Thread")
 }
 
-export const assertThreadOwnership = async (threadId: string, sessionId: string): Promise<void> => {
-  const ownerSessionId = await getThreadSessionId(threadId)
-  if (!ownerSessionId || ownerSessionId !== sessionId) {
-    throw new ForbiddenError("Thread does not belong to this session")
+export const assertThreadOwnership = async (threadId: string, userId: string): Promise<void> => {
+  const ownerUserId = await getThreadUserId(threadId)
+  if (!ownerUserId || ownerUserId !== userId) {
+    throw new ForbiddenError("Thread does not belong to this user")
   }
 }
